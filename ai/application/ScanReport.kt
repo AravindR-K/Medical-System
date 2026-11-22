@@ -1,7 +1,9 @@
 //Parsing pdf
+package application
+
 import java.io.File
 import java.io.InputStream
-package ai.domain.ocr_pipeline
+package ai.domain.OcrPipeline
 
 //Receive a radiology report, parse it, standardize the data
 fun processPDF(pdfFile: File):List<Any>{
