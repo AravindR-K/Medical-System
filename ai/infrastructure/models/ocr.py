@@ -2,6 +2,7 @@ import sys
 import pymupdf  # PyMuPDF
 import easyocr
 
+#REQUIREMENTS:
 
 def extract_pdf_content(pdf_path: str) -> str:
     reader = easyocr.Reader(["en"], gpu=False)
