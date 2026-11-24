@@ -17,6 +17,7 @@ def create_decider(model_id: str) -> Decider:
     return Decider(backend)
 
 
+#This function utilizes MedGemma wrapped with Nokia's AnyJev Library
 def master_decision(
         decider: Decider,
         question: str,
@@ -41,6 +42,8 @@ def master_decision(
         "diagnostics": result.diagnostics,
     }
 
+
+#This functon utilizes Laya Model
 def slave_decision(
         question: str,
         input_text: str,

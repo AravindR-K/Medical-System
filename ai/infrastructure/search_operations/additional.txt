@@ -1,0 +1,2 @@
+Remember the metadata based filtering logic, found in ocr+snowmed+rsna normalization
+Remember the search space logic found in ner.py
