@@ -1398,6 +1398,19 @@ def extract_pdf_content(pdf_path: str) -> dict:
 
     return document
 
+'''
+Returns
+-------
+dict
+{
+    "document_title": str | None,
+    "source_pdf": str,
+    "pages": list[dict],
+    "tables": list[dict],
+    "image_directory": str,
+    "json_path": str
+}
+'''
 
 # ============================================================
 # OPTIONAL DISPLAY HELPERS
@@ -1451,11 +1464,6 @@ def get_page_elements(
 
 
 
-#normalize the table sub-column titles and associate each table with title
-
-#USE SNOWMED for standardizing table sub-headers
-
-#USE RSNA's RadLex PLAYBOOK for standardising DICOM header
 
 
 
