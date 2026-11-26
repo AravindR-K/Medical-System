@@ -963,10 +963,13 @@ def _extract_table_objects(
                     "table_id": f"page_{page_number}_table_{table_index}",
                     "page_number": page_number,
                     "title": title,
-                    "columns": [
-                        str(col)
-                        for col in df.columns
-                    ],
+
+                    # First row: column headings
+                    "columns": [str(col) for col in df.columns],
+
+                    # First column: row headings
+                    "rows": [str(val) for val in df.iloc[:, 0]],
+
                     "data": df,
                 })
 
