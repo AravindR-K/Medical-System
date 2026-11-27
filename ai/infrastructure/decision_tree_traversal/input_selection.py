@@ -1,31 +1,98 @@
 #match the node question
 
 from similarity import SapBERTEmbedder, match_medical_terms
-from ..models.system_one_models import master_decision,slave_decision
+from ..models.system_one_models import master_decision as MD,slave_decision as SD
+from similarity import MedCPTRelevanceScorer
+from train_system_one import train_laya as TL
 
-
-def input_zone(document: dict,node_question:str)->dict:
+def make_decision(document: dict,node_question:str,parameter_ranges: dict)->dict:
 
     #initialize embedder object
 
-    embedder=SapBERTEmbedder()
+    #embedder=SapBERTEmbedder()
+
+
+    # dict
+    # {
+    #     "document_title": str | None,
+    #     "source_pdf": str,
+    #     "pages": list[dict],
+    #     "tables": list[dict],
+    #     "image_directory": str,
+    #     "json_path": str
+    # }
+
+    #__________________________________________________________________
+
+    #ask laya to decide which table is most relevant based on its title
+
+    table_titles=[]
 
     for table in document["tables"]:
+        title=table["title"]
+        table_titles.append(title)
+
+    laya_question="Select the table(s) that are most likely to contain the medical data relevant to the data requirements for answering the provided question"
+
+    laya_decision=SD(question=laya_question,input_text=node_question,options=table_titles)
+
+    selected_option=laya_decision["selected_option"]
+    prediction_set=laya_decision["prediction_set"]
+
+    #__________________________________________________________________
+
+    #extract useful data from these tables
+
+    scorer = MedCPTRelevanceScorer()
+    required_data={}
+
+    for table in prediction_set:
         column_names=table["columns"]
         row_names=table["rows"]
         data=table["data"]
 
         #use lexical similarity to select distinct entries in the rows and columns
 
-        required_columns=match_medical_terms(words=column_names,master_word=node_question, embedder=embedder)
-        required_rows=match_medical_terms(words=row_names,master_word=node_question, embedder=embedder)
+        #required_columns=match_medical_terms(words=column_names,master_word=node_question, embedder=embedder)
+        #required_rows=match_medical_terms(words=row_names,master_word=node_question, embedder=embedder)
 
-        database_entries=[(x,y) for x in row_names for y in column_names]
+        #use cross encoder
 
-        #ask laya and med-gemma as to which of this data is useful
+        #standardization of names improves its accuracy and makes it easier to fine tune cross encoder in future
 
-        slave_decision
+        required_columns=scorer.rank(master_query=node_question, candidates=column_names)
+        required_rows=scorer.rank(master_query=node_question, candidates=row_names)
 
+        for row in required_rows:
+            for column in required_columns:
+                required_data[f"{row}:{column}"]=data[row][column]
+
+    #__________________________________________________________________
+
+    #ask med-gemma to make final decision
+    SD(question=laya_question,input_text=node_question,options=table_titles)
+
+    #MODELS NEED TO KNOW THE MEDICAL CONTEXT AND NORMAL RANGE VALUES
+
+    context=f'''
+    
+    Permissible range of parameters: {parameter_ranges}
+    
+    Provided Medical Data of the Patient:
+    
+    {required_data}
+    
+    '''
+
+    route_options=["yes","no"]
+
+    laya_decision=SD(question=node_question,input_text=context,options=route_options)
+    medgemma_decision=MD(question=node_question,input_text=context,options=route_options)
+
+    #initiate training of the models
+    TL(laya_decision,medgemma_decision)
+
+    return medgemma_decision
 
 
 
