@@ -1,4 +1,8 @@
 
+
+
+#PART A: EMBEDDINGS+HYBRID LEXICAL APPROACH
+
 import torch
 import torch.nn.functional as F
 from transformers import AutoTokenizer, AutoModel
@@ -209,3 +213,113 @@ def match_medical_terms(
 
     return filtered_words
 
+
+
+#_____________________________________________________________________
+#PART B: USING CROSS ENCODER
+#_____________________________________________________________________
+
+
+import torch
+from transformers import (
+    AutoTokenizer,
+    AutoModelForSequenceClassification,
+)
+
+
+class MedCPTRelevanceScorer:
+    MODEL_NAME = "ncbi/MedCPT-Cross-Encoder"
+
+    def __init__(self, device=None, batch_size=16):
+        self.device = device or (
+            "cuda" if torch.cuda.is_available() else "cpu"
+        )
+
+        self.batch_size = batch_size
+
+        self.tokenizer = AutoTokenizer.from_pretrained(
+            self.MODEL_NAME
+        )
+
+        self.model = AutoModelForSequenceClassification.from_pretrained(
+            self.MODEL_NAME
+        )
+
+        self.model.to(self.device)
+        self.model.eval()
+
+    def rank(
+            self,
+            master_query: str,
+            candidates: list[str],
+    ) -> dict[str, float]:
+
+        if not master_query.strip() or not candidates:
+            return {}
+
+        scores = []
+
+        with torch.inference_mode():
+
+            for start in range(0, len(candidates), self.batch_size):
+
+                batch = candidates[start:start + self.batch_size]
+
+                pairs = [
+                    [master_query, candidate]
+                    for candidate in batch
+                ]
+
+                encoded = self.tokenizer(
+                    pairs,
+                    truncation=True,
+                    padding=True,
+                    return_tensors="pt",
+                    max_length=512,
+                )
+
+                encoded = {
+                    key: value.to(self.device)
+                    for key, value in encoded.items()
+                }
+
+                logits = self.model(**encoded).logits.squeeze(-1)
+
+                scores.extend(logits.cpu().tolist())
+
+        # Discard candidates with negative relevance logits
+        permitted = [
+            (candidate, score)
+            for candidate, score in zip(candidates, scores)
+            if score >= 0.5
+        ]
+
+        if not permitted:
+            return {}
+
+        # Min-Max normalization
+        min_score = min(score for _, score in permitted)
+        max_score = max(score for _, score in permitted)
+
+        if max_score == min_score:
+            normalized = {
+                candidate: 1.0
+                for candidate, _ in permitted
+            }
+        else:
+            normalized = {
+                candidate: round(
+                    (score - min_score) / (max_score - min_score),
+                    4,
+                    )
+                for candidate, score in permitted
+            }
+
+        # Return highest relevance first
+        return dict(
+            sorted(
+                normalized.items(),
+                key=lambda item: item[1],
+                reverse=True,
+            )
+        )
